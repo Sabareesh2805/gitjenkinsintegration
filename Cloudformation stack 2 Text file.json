@@ -1,0 +1,327 @@
+{
+   "Resources": {
+       "CloudFVPC": {
+           "Type": "AWS::EC2::VPC",
+           "Properties": {
+              "CidrBlock": "10.0.0.0/16",
+              "Tags" : [ {"Key" : "Name", "Value" : "CloudFVPC"} ]
+           }
+        },
+        "CloudFSubnetPublicOne": {
+           "Type": "AWS::EC2::Subnet",
+           "Properties": {
+              "VpcId": { "Ref" : "CloudFVPC" },
+              "AvailabilityZone": "ap-south-1a",
+              "CidrBlock": "10.0.0.0/24",
+              "MapPublicIpOnLaunch": true,
+              "Tags" : [ { "Key" : "Name", "Value" : "CloudFSubnetPublicOne" } ]
+           }
+        },
+        "CloudFSubnetPublicTwo": {
+         "Type": "AWS::EC2::Subnet",
+         "Properties": {
+            "VpcId": { "Ref" : "CloudFVPC" },
+            "AvailabilityZone": "ap-south-1b",
+            "CidrBlock": "10.0.8.0/24",
+            "MapPublicIpOnLaunch": true,
+            "Tags" : [ { "Key" : "Name", "Value" : "CloudFSubnetPublicTwo" } ]
+         }
+      },
+      "CloudFSubnetPrivateOne": {
+           "Type": "AWS::EC2::Subnet",
+           "Properties": {
+             "VpcId": { "Ref" : "CloudFVPC" },
+             "AvailabilityZone": "ap-south-1a",
+              "CidrBlock": "10.0.16.0/24",
+              "MapPublicIpOnLaunch": false,
+              "Tags" : [ { "Key" : "Name", "Value" : "CloudFSubnetPrivateOne" } ]
+           }
+        },
+        "CloudFSubnetPrivateTwo": {
+         "Type": "AWS::EC2::Subnet",
+         "Properties": {
+           "VpcId": { "Ref" : "CloudFVPC" },
+           "AvailabilityZone": "ap-south-1b",
+            "CidrBlock": "10.0.32.0/24",
+            "MapPublicIpOnLaunch": false,
+            "Tags" : [ { "Key" : "Name", "Value" : "CloudFSubnetPrivateTwo" } ]
+         }
+      },
+      "CloudFInternetGateway": {
+           "Type": "AWS::EC2::InternetGateway",
+           "Properties": {
+              "Tags": [ { "Key": "Name", "Value": "CloudFInternetGateway" } ]
+           }
+        },
+        "CloudFInternetGatewayAttachment": {
+           "Type": "AWS::EC2::VPCGatewayAttachment",
+           "Properties": {
+             "VpcId": { "Ref" : "CloudFVPC" },
+             "InternetGatewayId" : { "Ref" : "CloudFInternetGateway" }
+          }
+        },
+
+        "CloudFPublicRouteTable": {
+           "Type": "AWS::EC2::RouteTable",
+           "Properties": {
+             "VpcId": { "Ref" : "CloudFVPC" },
+             "Tags": [ { "Key": "Name", "Value": "CloudFPublicRouteTable" } ]
+           }
+        },
+        "CloudFPublicRoute": {
+           "Type": "AWS::EC2::Route",
+           "Properties": {
+             "RouteTableId" : { "Ref" : "CloudFPublicRouteTable" },
+             "DestinationCidrBlock": "0.0.0.0/0",
+             "GatewayId" : { "Ref" : "CloudFInternetGateway" }
+          }
+        },
+        "CloudFPublicSubnetOneRouteAssociation": {
+           "Type": "AWS::EC2::SubnetRouteTableAssociation",
+           "Properties": {
+             "SubnetId" : { "Ref" : "CloudFSubnetPublicOne" },
+             "RouteTableId" : { "Ref" : "CloudFPublicRouteTable" }
+             }
+        },
+        "CloudFPublicSubnetTwoRouteAssociation": {
+           "Type": "AWS::EC2::SubnetRouteTableAssociation",
+           "Properties": {
+             "SubnetId" : { "Ref" : "CloudFSubnetPublicTwo" },
+             "RouteTableId" : { "Ref" : "CloudFPublicRouteTable" }
+             }
+        },
+
+        "CloudFPrivateRouteTable": {
+           "Type": "AWS::EC2::RouteTable",
+           "Properties": {
+             "VpcId": { "Ref" : "CloudFVPC" },
+             "Tags": [ { "Key": "Name", "Value": "CloudFPrivateRouteTable" } ]
+           }
+        },
+        "CloudFPrivateRoute" : {
+          "Type" : "AWS::EC2::Route",
+          "Properties" : {
+             "RouteTableId" : { "Ref" : "CloudFPrivateRouteTable" },
+             "DestinationCidrBlock" : "0.0.0.0/0",
+             "NatGatewayId" : { "Ref" : "CloudFNatGateway" }
+          }
+       },
+       "CloudFPrivateSubnetOneRouteAssociation": {
+           "Type": "AWS::EC2::SubnetRouteTableAssociation",
+           "Properties": {
+           "SubnetId" : { "Ref" : "CloudFSubnetPrivateOne" },
+           "RouteTableId" : { "Ref" : "CloudFPrivateRouteTable" }
+           }
+        },
+        "CloudFPrivateSubnetTwoRouteAssociation": {
+           "Type": "AWS::EC2::SubnetRouteTableAssociation",
+           "Properties": {
+           "SubnetId" : { "Ref" : "CloudFSubnetPrivateTwo" },
+           "RouteTableId" : { "Ref" : "CloudFPrivateRouteTable" }
+           }
+        },
+        "CloudFNatGateway" : {
+           "Type" : "AWS::EC2::NatGateway",
+           "Properties" : {
+              "AllocationId" : { "Fn::GetAtt" : ["CloudFElasticIP", "AllocationId"]},
+              "SubnetId" : { "Ref" : "CloudFSubnetPublicOne" },
+              "Tags" : [ {"Key" : "Name", "Value" : "CloudFNatGateway" } ]
+              }
+        },
+        "CloudFElasticIP" : {
+           "DependsOn" : "CloudFVPC",
+           "Type" : "AWS::EC2::EIP",
+           "Properties" : {
+              "Domain" : "vpc",
+              "Tags" : [ {"Key" : "Name", "Value" : "CloudFElasticIP" } ]
+           }
+        },
+
+       "ApacheLoadBalancer" : {
+           "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+           "Properties": {
+               "CrossZone": "true",
+               "Listeners": [{
+                   "InstancePort": "80",
+                   "InstanceProtocol": "HTTP",
+                   "LoadBalancerPort": "80",
+                   "Protocol": "HTTP"
+               }],
+               "LoadBalancerName" : "ApacheLoadBalancer",
+               "Instances" : [
+                 { "Ref" : "ApacheInstance" }
+                ],
+               "Subnets" : [
+                   { "Ref" : "CloudFSubnetPublicOne" }
+               ],
+               "SecurityGroups" : [ { "Ref" : "LoadBalancerSecurityGroup" } ],
+               "Tags" : [ {"Key" : "Name", "Value" : "ApacheLoadBalancer" } ]
+           }
+       },
+       "NginxLoadBalancer" : {
+           "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+           "Properties": {
+              "CrossZone": "true",
+              "Listeners": [{
+                 "InstancePort": "80",
+                 "InstanceProtocol": "HTTP",
+                 "LoadBalancerPort": "80",
+                 "Protocol": "HTTP"
+              }],
+              "LoadBalancerName" : "NginxLoadBalancer",
+              "Instances" : [
+                 { "Ref" : "NginxInstance" }
+              ],
+              "Subnets" : [
+                 { "Ref" : "CloudFSubnetPublicTwo" }
+              ],
+              "SecurityGroups" : [ { "Ref" : "LoadBalancerSecurityGroup" } ],
+              "Tags" : [ {"Key" : "Name", "Value" : "NginxLoadBalancer" } ]
+           }
+        },
+       "LoadBalancerSecurityGroup" : {
+           "Type" : "AWS::EC2::SecurityGroup",
+           "Properties" : {
+              "GroupDescription" : "Enable HTTP access via port 80",
+              "GroupName" : "LoadBalancerSecurityGroup",
+              "VpcId": { "Ref" : "CloudFVPC" },
+              "Tags" : [ { "Key" : "Name", "Value" : "LoadBalancerSecurityGroup" } ],
+              "SecurityGroupIngress" : [
+                 {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"}
+              ]
+           }      
+        },
+       "ServerSecurityGroup" : {
+           "Type" : "AWS::EC2::SecurityGroup",
+           "Properties" : {
+              "GroupDescription" : "Enable HTTP access via port 80",
+              "GroupName" : "ServerSecurityGroup",
+              "VpcId": { "Ref" : "CloudFVPC" },
+              "Tags" : [ { "Key" : "Name", "Value" : "ServerSecurityGroup" } ],
+              "SecurityGroupIngress" : [
+                 {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"}
+              ]
+           }      
+        },
+        "ApacheInstance" : {
+           "Type" : "AWS::EC2::Instance",
+           "Properties" : {
+              "ImageId" : "ami-0d758c1134823146a",
+              "KeyName" : "jenkins-docker",
+              "InstanceType" : "t2.micro",
+              "BlockDeviceMappings" : [
+               {
+                    "DeviceName" : "/dev/sda1",
+                    "Ebs" : {
+                       "DeleteOnTermination" : "true",
+                       "Iops" : "200",
+                       "VolumeSize" : "8",
+                       "VolumeType" : "io1"
+                    }
+               }
+              ],
+              "UserData": {
+                 "Fn::Base64": {
+                   "Fn::Join": [
+                     "\n",
+                     [
+                         "#!/bin/bash -xe",
+                         "sudo apt-get update",
+                         "sudo apt-get install apache2 -y",
+                         "sudo systemctl start apache2"
+                     ]
+                   ]
+                 }
+              },
+              "NetworkInterfaces": [ {
+               "DeviceIndex": "0",
+               "GroupSet": [{ "Ref" : "ServerSecurityGroup" }],
+               "SubnetId": { "Ref" : "CloudFSubnetPrivateOne" }
+             } ],
+             "Tags" : [ { "Key" : "Name", "Value" : "ApacheInstance" } ]
+           }
+       },
+       "NginxInstance" : {
+           "Type" : "AWS::EC2::Instance",
+           "Properties" : {
+              "ImageId" : "ami-0d758c1134823146a",
+              "KeyName" : "jenkins-docker",
+              "InstanceType" : "t2.micro",
+              "BlockDeviceMappings" : [
+                 {
+                    "DeviceName" : "/dev/sda1",
+                    "Ebs" : {
+                       "DeleteOnTermination" : "true",
+                       "Iops" : "200",
+                       "VolumeSize" : "8",
+                       "VolumeType" : "io1"
+                    }
+                 }
+              ],
+              "UserData": {
+                 "Fn::Base64": {
+                   "Fn::Join": [
+                     "\n",
+                     [
+                         "#!/bin/bash -xe",
+                         "sudo apt-get update",
+                         "sudo apt install nginx -y",
+                         "sudo systemctl start nginx"
+                     ]
+                   ]
+                 }
+              },
+              "NetworkInterfaces": [ {
+              "DeviceIndex": "0",
+              "GroupSet": [{ "Ref" : "ServerSecurityGroup" }],
+              "SubnetId": { "Ref" : "CloudFSubnetPrivateTwo" }
+           } ],
+           "Tags" : [ { "Key" : "Name", "Value" : "NginxInstance" } ]
+           }
+        }
+  },
+
+  "Outputs" : {
+     "ApacheLoadBalancerDNSName" : {
+        "Description" : "DNS Name for Apache Server Load balancer",
+        "Value" : { "Fn::GetAtt" : [ "ApacheLoadBalancer", "DNSName" ] }
+     },
+     "NginxLoadBalancerDNSName" : {
+        "Description" : "DNS Name for Nginx Server Load balancer",
+        "Value" : { "Fn::GetAtt" : [ "NginxLoadBalancer", "DNSName" ] }
+     },
+     "ApacheServerLoadBalancer" : {
+        "Description" : "Load balancer for Apache Server",
+        "Value" : { "Ref" : "ApacheLoadBalancer" }
+     },
+     "NginxServerLoadBalancer" : {
+        "Description" : "Load balancer for Nginx Server",
+        "Value" : { "Ref" : "NginxLoadBalancer" }
+     },
+     "ApacheServerPrivateIP" : {
+        "Description" : "Private IP for Apache Server",
+        "Value" : { "Fn::GetAtt" : [ "ApacheInstance", "PrivateIp" ] }
+     },
+     "NginxServerPrivateIP" : {
+        "Description" : "Private IP for Nginx Server",
+        "Value" : { "Fn::GetAtt" : [ "NginxInstance", "PrivateIp" ] }
+     },
+     "ApacheServerPublicSubnet" : {
+        "Description" : "Public Subnet for Apache server",
+        "Value" : { "Ref" : "CloudFSubnetPublicOne" }
+     },
+     "NginxServerPublicSubnet" : {
+        "Description" : "Public Subnet for Nginx server",
+        "Value" : { "Ref" : "CloudFSubnetPublicTwo" }
+     },
+     "ApacheServerPrivateSubnet" : {
+        "Description" : "Private Subnet for Apache server",
+        "Value" : { "Ref" : "CloudFSubnetPrivateOne" }
+     },
+     "NginxServerPrivateSubnet" : {
+        "Description" : "Private Subnet for Nginx server",
+        "Value" : { "Ref" : "CloudFSubnetPrivateTwo" }
+     }
+  }
+}
+
